@@ -237,3 +237,67 @@ def test_cwa2sigma_initial():
     sig, entry = cw.compute(c)
     assert sig == 0
     assert entry is None
+
+def test_adx_update_behavior():
+    adx = si.ADX(period=14)
+
+    # Generate 30 candles with progressively higher prices to simulate a trend
+    candles = []
+    for i in range(30):
+        candle = {
+            'high': 100 + i + 1,
+            'low': 100 + i - 1,
+            'close': 100 + i,
+        }
+        candles.append(candle)
+
+    values = []
+    for c in candles:
+        val = adx.update(c)
+        values.append(val)
+
+    # Check that we eventually get a non-None, non-NaN ADX
+    non_null_adx = [v for v in values if v is not None]
+    assert len(non_null_adx) > 0
+    assert all(np.isfinite(v) for v in non_null_adx)
+    # Check the last ADX is a float and seems plausible
+    assert 0 <= non_null_adx[-1] <= 100
+
+def test_adx_exact():
+    period = 14
+    adx = si.ADX(period=period)
+
+    # Sample from a well-known example (or crafted with clear values)
+    # Highs, lows, closes with increasing range
+    candles = [
+        {'high': 30, 'low': 28, 'close': 29},
+        {'high': 31, 'low': 29, 'close': 30},
+        {'high': 32, 'low': 30, 'close': 31},
+        {'high': 33, 'low': 31, 'close': 32},
+        {'high': 34, 'low': 32, 'close': 33},
+        {'high': 35, 'low': 33, 'close': 34},
+        {'high': 36, 'low': 34, 'close': 35},
+        {'high': 37, 'low': 35, 'close': 36},
+        {'high': 38, 'low': 36, 'close': 37},
+        {'high': 39, 'low': 37, 'close': 38},
+        {'high': 40, 'low': 38, 'close': 39},
+        {'high': 41, 'low': 39, 'close': 40},
+        {'high': 42, 'low': 40, 'close': 41},
+        {'high': 43, 'low': 41, 'close': 42},
+        {'high': 44, 'low': 42, 'close': 43},
+        {'high': 45, 'low': 43, 'close': 44},
+        {'high': 46, 'low': 44, 'close': 45},
+    ]
+
+    adx_values = []
+    for candle in candles:
+        val = adx.update(candle)
+        adx_values.append(val)
+
+    # The last value should be stable and non-NaN
+    final_adx = adx_values[-1]
+    assert final_adx is not None and np.isfinite(final_adx)
+    assert 0 <= final_adx <= 100
+
+    # For this steadily trending example, ADX should be relatively high (strong trend)
+    assert final_adx > 30

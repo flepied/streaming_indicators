@@ -680,3 +680,55 @@ class CWA2Sigma:
         atr = self.ATR.update(candle)
         self.signal, self.entry_price, self.sl_price = self._signal_change_logic(candle, bbands[0], ema, atr)
         return self.value
+
+class ADX:
+    '''Average Directional Index (pure Python implementation)'''
+    def __init__(self, period: int):
+        self.period = period
+        self.count = 0
+        self.prev_candle = None
+        self.plus_dm_rma = RMA(period)
+        self.minus_dm_rma = RMA(period)
+        self.tr_rma = RMA(period)
+        self.adx_rma = RMA(period)
+        self.current_adx = None
+
+    def _compute_dm(self, candle):
+        up_move = candle['high'] - self.prev_candle['high']
+        down_move = self.prev_candle['low'] - candle['low']
+        plus_dm = up_move if up_move > down_move and up_move > 0 else 0
+        minus_dm = down_move if down_move > up_move and down_move > 0 else 0
+        return plus_dm, minus_dm
+
+    def _compute_tr(self, candle):
+        return max(
+            candle['high'] - candle['low'],
+            abs(candle['high'] - self.prev_candle['close']),
+            abs(candle['low'] - self.prev_candle['close'])
+        )
+
+    def update(self, candle):
+        if self.prev_candle is None:
+            self.prev_candle = candle
+            return None  # not enough data yet
+
+        plus_dm, minus_dm = self._compute_dm(candle)
+        tr = self._compute_tr(candle)
+
+        self.plus_dm_rma.update(plus_dm)
+        self.minus_dm_rma.update(minus_dm)
+        self.tr_rma.update(tr)
+
+        plus_di = 100 * self.plus_dm_rma.value / self.tr_rma.value if self.tr_rma.value else 0
+        minus_di = 100 * self.minus_dm_rma.value / self.tr_rma.value if self.tr_rma.value else 0
+        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di) if (plus_di + minus_di) else 0
+
+        adx = self.adx_rma.update(dx)
+        self.current_adx = adx
+        self.prev_candle = candle
+
+        return self.current_adx
+
+    @property
+    def value(self):
+        return self.current_adx
